@@ -1,52 +1,118 @@
-# Data Source Proposals
+# SOURCE.md
 
-## Proposal 1: Moodle login page response times at Reichman and Tel Aviv University
+## i. Data sources
 
-Research question: At which hours of the day are the Moodle login page response times the highest at Reichman University and Tel Aviv University, and do both universities experience their slowest response times during the same hours?
+### Main source: Moodle login pages and control sites
 
-Short explanation: As students we often feel that Moodle gets slow at certain times, especially before assignments are due. Every 10 minutes we will send one request to the public login page of Reichman's Moodle and of Tel Aviv University's Moodle (without logging in), and measure how long the Moodle server takes to send its first answer. In our initial samples, both endpoints returned HTTP 303 redirects. We do not follow these redirects, so our measurements reflect the initial response from each Moodle endpoint rather than the redirected login page. We do not measure the full loading of the page or actions after logging in, like submitting an assignment.
+| Name | Address | Data format | Key or username | License | Sampling frequency |
+|---|---|---|---|---|---|
+| Reichman University Moodle | https://moodle.runi.ac.il/2027/login/index.php | HTTP response, saved as CSV (curl output) | No | No license stated. No robots.txt (404) | Every 10 minutes |
+| Tel Aviv University Moodle | https://moodle.tau.ac.il/login/index.php | HTTP response, saved as CSV (curl output) | No | No license stated. No robots.txt (404) | Every 10 minutes |
+| Technion Moodle | https://moodle26.technion.ac.il/login/index.php | HTTP response, saved as CSV (curl output) | No | No license stated. No robots.txt (404) | Every 10 minutes |
+| Ariel University Moodle | https://moodlearn.ariel.ac.il/login/index.php | HTTP response, saved as CSV (curl output) | No | No license stated. No robots.txt (404) | Every 10 minutes |
+| Hebrew University Moodle | https://moodle.huji.ac.il/2026-27/login/index.php | HTTP response, saved as CSV (curl output) | No | No license stated. No robots.txt (404) | Every 10 minutes |
+| University of Nottingham Moodle (control, abroad) | https://moodle.nottingham.ac.uk/login/index.php | HTTP response, saved as CSV (curl output) | No | No license stated. No robots.txt (404) | Every 10 minutes |
+| Google (control, general site) | https://www.google.com | HTTP response, saved as CSV (curl output) | No | robots.txt does not block the home page | Every 10 minutes |
 
-Content: For each university in each sample: the time of the measurement (UTC), the name of the university, the HTTP status code and the response times in seconds (connect time, time until the server starts answering, and total time), measured with curl.
+### Supporting sources
 
-URLs:
-- Reichman University: https://moodle.runi.ac.il/2027/login/index.php
-- Tel Aviv University: https://moodle.tau.ac.il/login/index.php
+| Name | Address | Data format | Key or username | License | Sampling frequency |
+|---|---|---|---|---|---|
+| ipinfo.io | https://ipinfo.io/IP/json (IP is the server address) | JSON | No (free use without a token) | ipinfo.io free use terms | Once a day |
+| traceroute | Run from our computer to each server host name | Text | No | Not relevant (a tool we run ourselves) | Once a day |
 
-Update frequency: The response time changes on every request. We plan to sample every 10 minutes.
+## ii. Short explanation
 
-Expected size: About 200 bytes per sample (100 bytes for each university). With 144 samples a day for about 90 days, this is around 3 MB for the whole semester, so it stays below the 500 MB limit.
+Our research question is: At which hours of the day are the Moodle login page response times the highest at five Israeli universities (Reichman, Tel Aviv, Technion, Ariel and Hebrew University), and do all of them experience their slowest response times during the same hours?
 
-Key or password: None. We do not log in and there is no API key.
+We measure how long it takes each Moodle login page to respond. We do not save the page itself, only the measurement. We compare five Israeli universities, and we also measure two control sites. The University of Nottingham is a Moodle site abroad, where students live in a different time zone. Google is a general site that is not related to universities. If all sites get slower at the same hour, the problem is probably our own network. If only the Israeli Moodle sites get slower, it points to load on Moodle.
 
-Data sample (collected on 2026-11-04). For each university, the first number is the HTTP status code (303 is a redirect) and the second number is the total response time in seconds:
-- runi (Reichman University): 303 0.280931
-- tau (Tel Aviv University): 303 0.362244
+Not all sites answer in the same way. Reichman, Tel Aviv, Ariel and Hebrew University return an HTTP 303 redirect, while Technion and Nottingham return the login page directly (HTTP 200). This is why we measure every site twice:
 
-## Proposal 2: Status changes of upcoming space launches
+1. `no_follow`: only the first response, without following the redirect.
+2. `follow`: following all redirects until the real login page (curl `-L`). Here we also turn on cookies (curl `-b ""`). Without cookies, Reichman and Hebrew University ended on an error page instead of the login page.
 
-Research question: How often does the status of upcoming space launches change before launch day?
+The `follow` measurement lets us compare Technion and Nottingham fairly with the other sites.
 
-Short explanation: Every upcoming space launch has a status that shows how ready it is, for example TBD (the date is not set yet), TBC (there is a date but it is not confirmed) or Go (Go for Launch). The Launch Library 2 API by The Space Devs shows only the current status of each launch, not how it changed in the past. Every 30 minutes we will download the list of upcoming launches, and by comparing the samples we can see when the status of each launch changed and how long before the launch it became Go. We checked and found that the history of planned dates is already saved on another website (Space Right Now), but we did not find a history of launch statuses there, so we focus on the status.
+Once a day we also check where each server is. We use ipinfo.io to get the country and the company that owns the address, and traceroute to count the hops (routers) on the way to each server. This helps us explain differences between sites that come from distance and not from load.
 
-Content: For each launch in each sample: id, name, status, net (the planned date), window_start, window_end and last_updated, from a JSON list of upcoming launches.
+In our first checks, traceroute showed that Reichman, Technion, Hebrew University and Google are close to us (about 17 ms), and Tel Aviv, Ariel and Nottingham are far (about 75 to 80 ms). At Reichman, Tel Aviv and Ariel, the server that answers us is not Moodle itself but a protection service in front of it. Reichman's address belongs to Google and its host name is under `rbzdns.com`. Tel Aviv's address belongs to F5 Networks and Ariel's to Link11. So the measured time also includes this service. Because of these fixed differences, we compare each university to itself across the hours of the day, and not only the times between universities.
 
-URLs:
-- Launch Library 2 API, upcoming launches: https://ll.thespacedevs.com/2.3.0/launches/upcoming/?limit=50&mode=list
+Some addresses depend on the academic year (`/2027/` at Reichman, `moodle26` at Technion, `/2026-27/` at Hebrew University). If a university moves to a new address during the semester, we will update the address and write it in the README.
 
-Update frequency: The records are updated whenever there is new information, several times a day across all launches. We plan to sample every 30 minutes.
+## iii. Schema
 
-Expected size: About 40 KB per sample (50 launches). With 48 samples a day for about 90 days, this is around 170 MB for the whole semester without compression and about 20 to 30 MB with gzip, so it stays below the 500 MB limit.
+`dataset.csv` has one row for each site, each measurement mode and each sample time.
 
-Key or password: None. Without an account the API allows up to 15 requests per hour, and we need only 2.
+| Column | Content | Units |
+|---|---|---|
+| `timestamp_utc` | Date and time of the sample, taken from the file path | ISO 8601, UTC (for example `2026-11-16T10:24Z`) |
+| `site` | Short name of the site: `runi`, `tau`, `technion`, `ariel`, `huji`, `nottingham`, `google` | Text |
+| `site_group` | `israel` for the five Israeli universities, `abroad` for Nottingham, `general` for Google | Text |
+| `mode` | `no_follow` or `follow` | Text |
+| `http_code` | HTTP status code. `000` means there was no answer | Code |
+| `num_redirects` | Number of redirects until the final page | Count |
+| `response_time_ms` | Total time until the full answer arrived | Milliseconds |
+| `connect_time_ms` | Time until the connection to the server was open (automatic collection only) | Milliseconds |
+| `first_byte_ms` | Time until the first byte of the answer arrived (automatic collection only) | Milliseconds |
+| `server_ip` | IP address of the server curl connected to, in every measurement (automatic collection only) | Text |
+| `server_country` | Country of the address according to ipinfo | Two letter country code |
+| `server_org` | Company that owns the address according to ipinfo | Text |
+| `hops` | Number of the last hop that answered in that day's traceroute | Count |
+| `reached` | Whether traceroute reached the server itself | `yes` or `no` |
 
-Data sample (collected on 2026-11-08). A full sample returns 50 launches and is very long, so we show the name and status of a few of them. The closest launches are mostly Go, and launches that are further away are mostly TBC or TBD (in this sample: 8 Go, 5 TBC and 37 TBD):
-- Falcon 9 Block 5 | USSF-627 | Go
-- Starship | Starlink Group 31-2 (Starship Flight 15) | TBC
-- Soyuz 2.1b | Progress MS-36 (97P) | TBC
-- Long March 2F/G | Shenzhou 24 | TBD
-- Falcon 9 Block 5 | Cygnus CRS-2 NG-25 | Go
-- Falcon 9 Block 5 | NROL-195 | TBD
+Technion, Hebrew University and Nottingham do not answer traceroute. For them `hops` is the last hop that answered and `reached` is `no`, so their real number of hops is higher.
 
-## Ranking
-1. Proposal 1 (Moodle login page response times) is our first choice. It is connected to our everyday life as students, and the data exists only if we measure it.
-2. Proposal 2 (status changes of upcoming space launches) is our second choice.
+The response times are measured every 10 minutes, but `server_country`, `server_org`, `hops` and `reached` are checked only once a day. To add the daily data to each row, we match it by IP address. The daily ipinfo and traceroute results include the IP address that was checked. For each site and sample, we compare this address to the `server_ip` of the `no_follow` measurement, which is the first server that answers for that site. If the addresses are the same, the daily data is added to both rows of that sample (`no_follow` and `follow`). If the address is different, for example because the site moved to another server during the day, or if there is no daily data for that day, these four columns stay empty.
+
+## iv. Why we kept these columns
+
+We kept `response_time_ms` because it is the main measurement for our question. `connect_time_ms` and `first_byte_ms` split the total time into parts. A slow connection points to the network, and a slow first byte after a fast connection points to a busy server.
+
+We kept `http_code` and `num_redirects` because they almost never change. When they do change, it means something happened to the site, and we should not use that time as a normal measurement.
+
+We kept `site_group` so we can easily compare the Israeli sites with the control sites.
+
+We kept `server_ip` in every measurement so we can see if the site moves to a different server during the day. If the response time jumps and the address changed too, the jump may come from the new server and not from load.
+
+We kept `server_org`, `server_country`, `hops` and `reached` to explain differences that come from distance. They change very rarely, so we check them only once a day.
+
+We did not keep:
+
+1. The full URL. It is long and repeats in every row, so we replaced it with the short `site` name. The full URL stays in the raw files.
+2. The final address after the redirects. It is very long and contains a new one time code every time.
+3. The page content. It is not needed for our question, so curl does not save it at all.
+4. The city from ipinfo. For Google and F5 addresses it showed cities in the USA, but traceroute showed answer times that are too short for the USA. So the city is not reliable for these servers.
+5. The full list of hops from traceroute. We only need how far the server is.
+
+## v. Translation table
+
+| Source | Field in the source | Column in our schema | Change |
+|---|---|---|---|
+| raw file path | `raw/YYYY-mm-dd/HHMM.csv` | `timestamp_utc` | Built from the folder and file name |
+| raw CSV | `url` | `site`, `site_group` | Replaced by a short name and a group |
+| raw CSV | `mode` | `mode` | None |
+| curl | `%{http_code}` | `http_code` | None |
+| curl | `%{num_redirects}` | `num_redirects` | None |
+| curl | `%{time_total}` | `response_time_ms` | Seconds × 1000 |
+| curl | `%{time_connect}` | `connect_time_ms` | Seconds × 1000 |
+| curl | `%{time_starttransfer}` | `first_byte_ms` | Seconds × 1000 |
+| curl | `%{remote_ip}` | `server_ip` | None |
+| ipinfo | `country` | `server_country` | None |
+| ipinfo | `org` | `server_org` | None |
+| traceroute | Number of the last line that answered | `hops` | None |
+| traceroute | Is the last line the server address | `reached` | `yes` or `no` |
+
+## vi. Expected size after a semester
+
+We assume about ten weeks (70 days) of automatic collection, every 10 minutes. That is 144 samples a day and about 10,000 samples in total.
+
+`raw/`: one sample file has a header and 14 lines (7 sites × 2 modes), about 1.5 KB. 10,000 × 1.5 KB is about 15 MB. The daily traceroute and ipinfo files add about 1 MB. In total about 16 MB.
+
+`dataset.csv`: 14 rows for each sample, so about 140,000 rows. A row is up to about 140 bytes, so the file will be up to about 20 MB.
+
+Both are far below the 500 MB limit.
+
+## Use of AI
+
+"Hi Chat, we need to prepare a project, and we thought about an idea to check at which hours of the day the Moodle of Reichman and of Tel Aviv University is the slowest, and whether there are hours when both are slow. We want to check if this idea is possible at all, and if the data can be collected automatically during the semester. Help us understand how we can check the response times of the sites from Linux without logging in to Moodle. Explain to us which checks we need to run and what the results we get mean. In the end, help us write everything in English and organize it in a SOURCE.md file in Markdown format, without changing our idea and without adding data that we did not really check."
