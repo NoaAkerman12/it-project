@@ -1,0 +1,15 @@
+url,mode,http_code,num_redirects,time_total
+https://moodle.runi.ac.il/2027/login/index.php,no_follow,303,0,0.193227
+https://moodle.runi.ac.il/2027/login/index.php,follow,200,3,0.593291
+https://moodle.tau.ac.il/login/index.php,no_follow,303,0,0.518198
+https://moodle.tau.ac.il/login/index.php,follow,200,2,1.030805
+https://moodle26.technion.ac.il/login/index.php,no_follow,200,0,0.174430
+https://moodle26.technion.ac.il/login/index.php,follow,200,0,0.195497
+https://moodlearn.ariel.ac.il/login/index.php,no_follow,303,0,0.349153
+https://moodlearn.ariel.ac.il/login/index.php,follow,200,1,0.725564
+https://moodle.huji.ac.il/2026-27/login/index.php,no_follow,303,0,0.161878
+https://moodle.huji.ac.il/2026-27/login/index.php,follow,200,2,0.313332
+https://moodle.nottingham.ac.uk/login/index.php,no_follow,200,0,0.864399
+https://moodle.nottingham.ac.uk/login/index.php,follow,200,0,0.553823
+https://www.google.com,no_follow,200,0,0.452336
+https://www.google.com,follow,200,0,0.442275
