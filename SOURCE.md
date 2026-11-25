@@ -18,8 +18,8 @@
 
 | Name | Address | Data format | Key or username | License | Sampling frequency |
 |---|---|---|---|---|---|
-| ipinfo.io | https://ipinfo.io/IP/json (IP is the server address) | JSON | No (free use without a token) | ipinfo.io free use terms | Once a day |
-| traceroute | Run from our computer to each server host name | Text | No | Not relevant (a tool we run ourselves) | Once a day |
+| ipinfo.io | https://ipinfo.io/IP/json (IP is the server address from the `no_follow` measurement) | JSON | No (free use without a token) | ipinfo.io free use terms | Once a day |
+| traceroute | Run from our computer to the server IP from the `no_follow` measurement (to the host name if the site did not answer) | Text | No | Not relevant (a tool we run ourselves) | Once a day |
 
 ## ii. Short explanation
 
@@ -35,6 +35,17 @@ Not all sites answer in the same way. Reichman, Tel Aviv, Ariel and Hebrew Unive
 The `follow` measurement lets us compare Technion and Nottingham fairly with the other sites.
 
 Once a day we also check where each server is. We use ipinfo.io to get the country and the company that owns the address, and traceroute to count the hops (routers) on the way to each server. This helps us explain differences between sites that come from distance and not from load.
+
+All the data is collected by the script `bin/collect.sh`. Each source has its own file, and the file name shows its content. Every run saves the response times of all sites to `raw/YYYY-mm-dd/HHMM_websites.csv` (UTC). The first run of each day (UTC) also runs the daily checks and saves them with the same `HHMM` as that run:
+
+1. `raw/YYYY-mm-dd/HHMM_ipinfo.json`: a JSON array with one object for each of the seven sites, `{"site", "ip", "ipinfo"}`. `site` is the short site name, `ip` is the address that was checked, and `ipinfo` is the answer from ipinfo.io (`null` if there was no address or no valid answer).
+2. `raw/YYYY-mm-dd/HHMM_traceroute.txt`: for each site, a `=== site:` line with the short site name, and then the traceroute output. Its first line includes the address that was checked.
+
+Both checks use the server IP from the `no_follow` measurement of that run, so ipinfo and traceroute check the same server that curl measured. traceroute runs with `-n` (addresses only), `-q 1` (one probe per hop) and `-w 2` (wait at most 2 seconds for each hop), so it does not get stuck on servers that do not answer.
+
+Every file is first written to a temporary file in `tmp/`, outside `raw/`, and moved to `raw/` only when it is complete. If a run stops in the middle, nothing is added to `raw/`. The script never replaces a file that is already in `raw/`.
+
+The four manual samples from before the automatic collection (16 to 19 November 2026) are saved as `raw/YYYY-mm-dd/HHMM.csv`, without `_websites`. Files in `raw/` are never renamed, so they keep this name. They have the same columns as the `_websites.csv` files, except `time_connect`, `time_starttransfer` and `remote_ip`.
 
 In our first checks, traceroute showed that Reichman, Technion, Hebrew University and Google are close to us (about 17 ms), and Tel Aviv, Ariel and Nottingham are far (about 75 to 80 ms). At Reichman, Tel Aviv and Ariel, the server that answers us is not Moodle itself but a protection service in front of it. Reichman's address belongs to Google and its host name is under `rbzdns.com`. Tel Aviv's address belongs to F5 Networks and Ariel's to Link11. So the measured time also includes this service. Because of these fixed differences, we compare each university to itself across the hours of the day, and not only the times between universities.
 
@@ -89,7 +100,7 @@ We did not keep:
 
 | Source | Field in the source | Column in our schema | Change |
 |---|---|---|---|
-| raw file path | `raw/YYYY-mm-dd/HHMM.csv` | `timestamp_utc` | Built from the folder and file name |
+| raw file path | `raw/YYYY-mm-dd/HHMM_websites.csv` (manual samples: `raw/YYYY-mm-dd/HHMM.csv`) | `timestamp_utc` | Built from the folder and file name |
 | raw CSV | `url` | `site`, `site_group` | Replaced by a short name and a group |
 | raw CSV | `mode` | `mode` | None |
 | curl | `%{http_code}` | `http_code` | None |
@@ -98,16 +109,18 @@ We did not keep:
 | curl | `%{time_connect}` | `connect_time_ms` | Seconds × 1000 |
 | curl | `%{time_starttransfer}` | `first_byte_ms` | Seconds × 1000 |
 | curl | `%{remote_ip}` | `server_ip` | None |
-| ipinfo | `country` | `server_country` | None |
-| ipinfo | `org` | `server_org` | None |
-| traceroute | Number of the last line that answered | `hops` | None |
-| traceroute | Is the last line the server address | `reached` | `yes` or `no` |
+| `HHMM_ipinfo.json` | `ip` of each site | None | Used only to match by IP |
+| `HHMM_ipinfo.json` | `ipinfo.country` | `server_country` | None |
+| `HHMM_ipinfo.json` | `ipinfo.org` | `server_org` | None |
+| `HHMM_traceroute.txt` | Address in the first line of each site | None | Used only to match by IP |
+| `HHMM_traceroute.txt` | Number of the last line that answered | `hops` | None |
+| `HHMM_traceroute.txt` | Is the last line the server address | `reached` | `yes` or `no` |
 
 ## vi. Expected size after a semester
 
 We assume about ten weeks (70 days) of automatic collection, every 10 minutes. That is 144 samples a day and about 10,000 samples in total.
 
-`raw/`: one sample file has a header and 14 lines (7 sites × 2 modes), about 1.5 KB. 10,000 × 1.5 KB is about 15 MB. The daily traceroute and ipinfo files add about 1 MB. In total about 16 MB.
+`raw/`: one sample file has a header and 14 lines (7 sites × 2 modes), about 1.5 KB. 10,000 × 1.5 KB is about 15 MB. The daily ipinfo and traceroute files (two a day, a few KB each) add less than 1 MB. In total about 16 MB.
 
 `dataset.csv`: 14 rows for each sample, so about 140,000 rows. A row is up to about 140 bytes, so the file will be up to about 20 MB.
 
